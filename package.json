@@ -1,0 +1,19 @@
+{
+  "name": "cmd-ai-adoption-exam-2026",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CMD AI Adoption Exam 2026 — Event Registration System",
+  "scripts": {
+    "dev:web": "pnpm --filter web dev",
+    "dev:api": "pnpm --filter api start:dev",
+    "dev": "concurrently -k -n api,web -c blue,green \"pnpm dev:api\" \"pnpm dev:web\"",
+    "dev:tunnel": "concurrently -k -n api,web,ngrok -c blue,green,magenta \"pnpm dev:api\" \"pnpm dev:web\" \"ngrok http 3000 --log=stdout\"",
+    "build:web": "pnpm --filter web build",
+    "build:api": "pnpm --filter api build",
+    "test:api": "pnpm --filter api test:e2e"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  },
+  "packageManager": "pnpm@9.0.0"
+}

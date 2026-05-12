@@ -1,0 +1,10 @@
+version: "3"
+# Authtoken comes from your global ngrok config (~/Library/Application Support/ngrok/ngrok.yml),
+# set with `ngrok config add-authtoken <TOKEN>`.
+tunnels:
+  web:
+    proto: http
+    addr: 3000
+    # To pin a domain, uncomment and use a domain you've reserved at
+    # https://dashboard.ngrok.com/domains:
+    # domain: your-name.ngrok-free.app

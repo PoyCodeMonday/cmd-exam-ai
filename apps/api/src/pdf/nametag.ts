@@ -13,13 +13,26 @@ export interface NametagInput {
   qrUrl: string;
 }
 
-// Find the assets dir whether we're running compiled (dist/) or via ts-node from src/.
+// Find the fonts directory across deployment shapes:
+//   * Local Nest standalone:  apps/api/dist/pdf  -> apps/api/dist/assets/fonts
+//   * Local Nest via ts-node: apps/api/src/pdf   -> apps/api/assets/fonts
+//   * Vercel serverless fn:   /var/task/apps/web/.next/server/.../* -> fonts traced into the bundle
 function fontsDir(): string {
+  const cwd = process.cwd();
   const candidates = [
-    path.resolve(__dirname, '../assets/fonts'),       // dist/pdf -> dist/assets/fonts
-    path.resolve(__dirname, '../../assets/fonts'),    // src/pdf -> apps/api/assets/fonts
-    path.resolve(process.cwd(), 'assets/fonts'),
-    path.resolve(process.cwd(), 'apps/api/assets/fonts'),
+    // bundled-with-web (Vercel): fonts at <web>/fonts copied into the function
+    path.resolve(cwd, 'apps/web/fonts'),
+    path.resolve(cwd, 'fonts'),
+    // dist build for standalone Nest
+    path.resolve(__dirname, '../assets/fonts'),
+    path.resolve(__dirname, '../../assets/fonts'),
+    // ts-node / local dev under apps/api
+    path.resolve(cwd, 'assets/fonts'),
+    path.resolve(cwd, 'apps/api/assets/fonts'),
+    // Vercel layout: function runs under .next/server, walk up
+    path.resolve(__dirname, '../../../../fonts'),
+    path.resolve(__dirname, '../../../../../fonts'),
+    path.resolve(__dirname, '../../../../../../fonts'),
   ];
   for (const c of candidates) if (fs.existsSync(c)) return c;
   throw new Error(`Fonts directory not found. Tried: ${candidates.join(', ')}`);

@@ -3,8 +3,11 @@ import type { NextConfig } from 'next';
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   transpilePackages: ['api'],
+  // Ensure the PDF-rendering fonts are bundled into the serverless function.
+  // The trace root is the workspace root so the include pattern resolves cleanly.
+  outputFileTracingRoot: process.cwd(),
   outputFileTracingIncludes: {
-    '/api/**/*': ['../../apps/api/assets/fonts/**/*'],
+    '/api/**/*': ['./fonts/**/*'],
   },
   experimental: {
     // Server actions and the catch-all API route both need server-side externals.

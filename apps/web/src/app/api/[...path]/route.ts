@@ -11,7 +11,21 @@ let handler: ReturnType<typeof serverlessExpress> | null = null;
 async function getHandler() {
   if (handler) return handler;
   const app = await getExpressApp();
-  handler = serverlessExpress({ app });
+  handler = serverlessExpress({
+    app,
+    // Treat these as binary so the handler base64-encodes the response body
+    // instead of stringifying it (which corrupts non-ASCII bytes in PDFs etc.).
+    binarySettings: {
+      contentTypes: [
+        'application/pdf',
+        'application/octet-stream',
+        'image/*',
+        'application/zip',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/msword',
+      ],
+    },
+  });
   return handler;
 }
 
@@ -67,9 +81,21 @@ async function forward(req: Request): Promise<Response> {
   for (const [k, v] of Object.entries(result.headers || {})) {
     if (typeof v === 'string') respHeaders.set(k, v);
   }
-  const respBody = result.isBase64Encoded
-    ? Buffer.from(result.body || '', 'base64')
-    : result.body;
+  // Belt-and-braces: if the response is base64-encoded OR the content-type
+  // looks binary, decode/encode through a Buffer so we don't accidentally
+  // utf-8-mangle binary bytes anywhere downstream.
+  const ct = (respHeaders.get('content-type') || '').toLowerCase();
+  const looksBinary = /^(application\/(pdf|octet-stream|zip|msword|vnd\.openxmlformats)|image\/)/.test(ct);
+  let respBody: BodyInit;
+  if (result.isBase64Encoded) {
+    respBody = Buffer.from(result.body || '', 'base64');
+  } else if (looksBinary && typeof result.body === 'string') {
+    // serverless-express handed us binary bytes as a "latin1" string. Convert
+    // back to a Buffer using latin1 so byte values are preserved.
+    respBody = Buffer.from(result.body, 'latin1');
+  } else {
+    respBody = result.body;
+  }
   return new Response(respBody, {
     status: result.statusCode || 200,
     headers: respHeaders,

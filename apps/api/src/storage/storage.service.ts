@@ -45,6 +45,19 @@ export interface StorageUpload {
  * `getInstance()` returns the singleton bound to the current env. Tests
  * can override the pool by injecting via Nest's `useValue`.
  */
+// Centralised SELECT lists so we never `select *` (which produced ambiguous
+// columns when paired with to_char(...) AS same_name).
+const REG_COLS = `
+  id, reference_code, password_hash, name, name_th, name_en,
+  email, phone, organization, dietary, tshirt_size, notes,
+  to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as created_at,
+  to_char(updated_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as updated_at
+`;
+const DOC_COLS = `
+  id, registration_id, filename, storage_path, mime_type, size_bytes,
+  to_char(uploaded_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as uploaded_at
+`;
+
 @Injectable()
 export class StorageService implements OnModuleInit {
   private pool!: Pool;
@@ -123,9 +136,7 @@ export class StorageService implements OnModuleInit {
            (id, reference_code, password_hash, name, name_th, name_en,
             email, phone, organization, dietary, tshirt_size, notes)
          values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-         returning *,
-           to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as created_at,
-           to_char(updated_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as updated_at`,
+         returning ${REG_COLS}`,
         [
           row.id, row.reference_code, row.password_hash,
           row.name, row.name_th, row.name_en,
@@ -146,10 +157,7 @@ export class StorageService implements OnModuleInit {
 
   async findByReferenceCode(code: string): Promise<RegistrationRow | null> {
     const r = await this.pool.query(
-      `select *,
-        to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as created_at,
-        to_char(updated_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as updated_at
-       from registrations where reference_code = $1`,
+      `select ${REG_COLS} from registrations where reference_code = $1`,
       [code],
     );
     return r.rows[0] || null;
@@ -157,10 +165,7 @@ export class StorageService implements OnModuleInit {
 
   async findById(id: string): Promise<RegistrationRow | null> {
     const r = await this.pool.query(
-      `select *,
-        to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as created_at,
-        to_char(updated_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as updated_at
-       from registrations where id = $1`,
+      `select ${REG_COLS} from registrations where id = $1`,
       [id],
     );
     return r.rows[0] || null;
@@ -195,10 +200,7 @@ export class StorageService implements OnModuleInit {
 
   async listAllRegistrations(): Promise<RegistrationRow[]> {
     const r = await this.pool.query(
-      `select *,
-        to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as created_at,
-        to_char(updated_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as updated_at
-       from registrations order by created_at desc`,
+      `select ${REG_COLS} from registrations order by registrations.created_at desc`,
     );
     return r.rows;
   }
@@ -207,10 +209,9 @@ export class StorageService implements OnModuleInit {
 
   async listDocuments(registrationId: string): Promise<RegistrationDocumentRow[]> {
     const r = await this.pool.query(
-      `select *,
-        to_char(uploaded_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as uploaded_at
-       from registration_documents where registration_id = $1
-       order by uploaded_at asc`,
+      `select ${DOC_COLS} from registration_documents
+       where registration_id = $1
+       order by registration_documents.uploaded_at asc`,
       [registrationId],
     );
     return r.rows;
@@ -218,9 +219,7 @@ export class StorageService implements OnModuleInit {
 
   async findDocument(id: string): Promise<RegistrationDocumentRow | null> {
     const r = await this.pool.query(
-      `select *,
-        to_char(uploaded_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as uploaded_at
-       from registration_documents where id = $1`,
+      `select ${DOC_COLS} from registration_documents where id = $1`,
       [id],
     );
     return r.rows[0] || null;
@@ -233,8 +232,7 @@ export class StorageService implements OnModuleInit {
       `insert into registration_documents
          (id, registration_id, filename, storage_path, mime_type, size_bytes)
        values ($1,$2,$3,$4,$5,$6)
-       returning *,
-        to_char(uploaded_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as uploaded_at`,
+       returning ${DOC_COLS}`,
       [row.id, row.registration_id, row.filename, row.storage_path, row.mime_type, row.size_bytes],
     );
     return r.rows[0];
@@ -244,8 +242,7 @@ export class StorageService implements OnModuleInit {
     const r = await this.pool.query(
       `delete from registration_documents
        where id = $1 and registration_id = $2
-       returning *,
-        to_char(uploaded_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as uploaded_at`,
+       returning ${DOC_COLS}`,
       [id, registrationId],
     );
     return r.rows[0] || null;
